@@ -1,0 +1,58 @@
+{
+  "name": "stoa-mcp",
+  "version": "0.1.1",
+  "description": "The Specification Compiler for AI Agents. Transform vague tasks into executable specs with blind test scenarios.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "stoa": "dist/cli.js",
+    "stoa-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "test": "tsc && node --test dist/core/parsers.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.test.js",
+    "!dist/**/*.test.d.ts",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "mcp",
+    "specification",
+    "ai-coding",
+    "spec-score",
+    "refine",
+    "claude",
+    "cursor",
+    "guardrails"
+  ],
+  "author": "Lambis Stratoudakis",
+  "license": "MIT",
+  "homepage": "https://stoafactory.dev",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LambisStratoudakis/stoa-mcp"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "ora": "^9.3.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.4.0",
+    "typescript": "^5.9.3"
+  }
+}

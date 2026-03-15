@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tgz
+.stoa/
+.DS_Store
+.user-messages/
+CLAUDE.md
+patch.js
+patch.mjs
+USER-GUIDE-NOTES.md
