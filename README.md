@@ -388,7 +388,7 @@ The CLI is the free version. The full loop lives in the Stoa desktop app:
 - Task hierarchy (parent → subtask → fix task)
 - Dashboard with spec scores across all tasks
 
-**Same pipeline, full GUI.** Coming soon at [stoafactory.com](https://stoafactory.com).
+**Same pipeline, full GUI.** Coming soon at [stoafactory.com](https://stoafactory.dev).
 
 ---
 
