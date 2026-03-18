@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Stoa MCP Server entry point.
  * Registers refine_task, score_spec tools, guardrails resource, and refine prompt.
