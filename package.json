@@ -1,6 +1,6 @@
 {
   "name": "stoa-mcp",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "The Specification Compiler for AI Agents. Transform vague tasks into executable specs with blind test scenarios.",
   "type": "module",
   "main": "dist/index.js",
