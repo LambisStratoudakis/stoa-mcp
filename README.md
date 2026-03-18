@@ -32,48 +32,60 @@ This creates a `.stoa/` folder with everything Stoa needs:
 ```
 .stoa/
   moodboard/notes.md    ← your design direction (colors, layout, style)
+  moodboard/tokens.json  ← auto-generated machine-readable design tokens
   context.md            ← dependencies, conventions, brand voice
   lessons.md            ← project memory (grows automatically)
   guardrails/           ← rules the AI must follow
   roles/                ← AI personas (Builder, Fixer, Planner)
+  presets/              ← your saved custom style presets
   specs/                ← saved specifications
 ```
 
+Every new project starts with the **Clean** style preset (white, minimal, Linear-style). Every spec you generate will include these design tokens automatically.
+
 ### 2. Set up your moodboard (optional but powerful)
 
-Open the moodboard file:
+Your project already has a working design system. Check it:
 
 ```bash
-stoa edit moodboard
+stoa moodboard
 ```
 
-Replace the template with your design preferences:
+**Want a different style?** Pick a preset:
 
-```markdown
-# Design Direction
-Minimal and dark like Linear
-
-# Colors
-Primary: #E8C872
-Background: #1A1A1A
-Text: #F5F5F5
-
-# Layout
-Sidebar navigation left, main content right
-
-# Typography
-Clean sans-serif, large headings
+```bash
+stoa moodboard preset
 ```
 
-That's it. Four lines. Every spec you generate will include these design tokens.
+Use arrow keys to browse 4 built-in presets with live previews:
+- **Clean** — White, minimal, Linear/Vercel style
+- **Dark** — Dark background, muted accents, GitHub/Raycast style
+- **Warm** — Cream tones, friendly SaaS feel
+- **Bold** — High contrast, sharp corners, brutalist
 
-**Have a screenshot of a design you like?** Drop it in `.stoa/moodboard/` and run:
+Or apply directly: `stoa moodboard preset dark`
+
+**Want to customize?** Edit interactively in the terminal:
+
+```bash
+stoa moodboard edit
+```
+
+Walks you through each field (colors, typography, layout) one by one. Press Enter to keep, type a new value to change, or `q` to quit anytime.
+
+**Have a screenshot of a design you like?** Run:
 
 ```bash
 stoa moodboard describe
 ```
 
-If you have an Anthropic API key, Stoa will analyze the image and write the design system for you. If not, it prints a prompt you can paste into any Claude chat along with your screenshot.
+This opens the moodboard folder in Finder — drop your screenshots in, press Enter. If you have an Anthropic API key, Stoa analyzes the images and writes the design system for you. If not, it prints a prompt you can paste into any Claude chat.
+
+**Save your custom style** for reuse across projects:
+
+```bash
+stoa moodboard save-preset my-brand
+```
 
 ### 3. Refine your idea
 
@@ -92,34 +104,46 @@ Stoa runs 5 stages:
 After refining, Stoa:
 - Saves the spec as readable markdown files in `.stoa/specs/`
 - Copies Stage 1 to your clipboard automatically
-- Prints a build command you can use with Claude Code
+- Shows an interactive menu:
 
 ```
 Spec saved to .stoa/specs/personal-finance-tracker/
-Score: 5/5 Executable
+Spec Score: 5 / 5
 
 → Stage 1 description copied to clipboard
   Paste into Lovable, Bolt, v0, or any AI tool
 
-→ Build prompt for Claude Code:
-  Read the spec in .stoa/specs/personal-finance-tracker/ and build it.
-
-→ Scenarios saved. Run: stoa scenarios run
+What next?
+  [b] Build with Claude Code
+  [c] Copy spec to clipboard
+  [e] Export as single markdown
+  [v] View spec files
+  [q] Done
 ```
+
+- **[b] Build** — launches Claude Code with the spec pre-loaded
+- **[c] Copy** — re-copies the full spec to clipboard (useful if you copied something else)
+- **[e] Export** — writes all 5 stages as a single markdown to `specs/<slug>/spec.md` in your project root (visible, not hidden inside `.stoa/`)
+- **[v] View** — opens the spec directory in Finder
+- **[q] Done** — exits
 
 ### 4. Build
 
-**Option A — Paste into any AI tool:**
+**Option A — Press [b] after refine:**
+
+The fastest path. Press `b` in the post-refine menu and Claude Code starts building immediately.
+
+**Option B — Paste into any AI tool:**
 
 Open Lovable, Bolt, v0, or any AI coding tool. Press Cmd+V. The spec is already on your clipboard. The AI builds exactly what you specified.
 
-**Option B — Use Claude Code:**
+**Option C — Use Claude Code manually:**
 
 ```bash
 claude "Read the spec in .stoa/specs/personal-finance-tracker/ and build it. Follow all constraints and subtasks."
 ```
 
-**Option C — Use Cursor with Claude Code extension:**
+**Option D — Use Cursor with Claude Code extension:**
 
 Open the project folder in Cursor. Open Claude Code from the sidebar. Paste the build prompt.
 
@@ -173,12 +197,11 @@ Stage 1 will reference your existing files, components, and design system. The s
 
 ## Changing the Design
 
-Update your moodboard, then refine:
+Switch preset, edit interactively, or both:
 
 ```bash
-stoa edit moodboard
-# Change colors, layout, style...
-
+stoa moodboard preset dark       # switch to dark theme
+stoa moodboard edit              # tweak individual values
 stoa refine "Redesign the app to match the updated design system"
 ```
 
@@ -194,6 +217,7 @@ All files in `.stoa/` are optional. Use what you need, ignore what you don't.
 |------|-------------|----------|
 | `moodboard/notes.md` | Design direction: colors, layout, typography | Web apps, UI projects |
 | `moodboard/tokens.json` | Auto-generated machine-readable design values | Generated by `stoa moodboard sync` |
+| `presets/*.json` | Custom saved style presets | Reuse across projects |
 | `context.md` | Dependencies, conventions, brand voice | All projects |
 | `lessons.md` | Past mistakes — auto-grows, prevents repeats | All projects (grows over time) |
 | `guardrails/*.md` | Rules the AI must follow (e.g. "don't delete code") | All projects |
@@ -241,60 +265,190 @@ Every future refine includes past lessons as failure modes to avoid. Your projec
 
 ## CLI Reference
 
+### Setup
+
 ```bash
-# Setup
-stoa init                        # Create .stoa/ folder with templates
-stoa edit moodboard              # Open moodboard in your editor
-stoa edit context                # Open context.md in your editor
-stoa edit lessons                # Open lessons.md in your editor
+stoa init
+```
+Creates `.stoa/` in the current directory with the Clean style preset, 5 guardrails, and 3 roles. Run this once per project.
 
-# Moodboard
-stoa moodboard sync              # Generate tokens.json from notes.md
-stoa moodboard describe          # AI-analyze screenshots in moodboard/
-stoa moodboard describe --overwrite  # Overwrite existing notes.md
+```bash
+stoa edit moodboard          # open moodboard in VS Code/Cursor
+stoa edit context             # open context.md
+stoa edit lessons             # open lessons.md
+```
+Opens files in the best available editor. Detection order: Cursor → VS Code → `$EDITOR` → macOS default → nano.
 
-# Refine
-stoa refine "your task"          # Run 5-stage pipeline
-stoa refine "task" --mode api    # Force API mode (needs API key)
-stoa refine "task" --mode clipboard  # Get prompts without AI calls
+---
 
-# Specs
-stoa specs list                  # List all saved specs
-stoa specs show <name>           # View a spec's contents
+### Moodboard
 
-# Scenarios
-stoa scenarios list              # List scenarios for latest spec
+```bash
+stoa moodboard
+```
+Shows current moodboard status: active style, color count, image count, and available commands.
+
+```bash
+stoa moodboard preset
+```
+**Interactive.** Browse 4 built-in presets (Clean, Dark, Warm, Bold) + any custom presets with arrow keys. Shows a live preview with colors, typography, and references. Press **Enter** to apply, **q** to cancel.
+
+You can also apply directly without the picker:
+```bash
+stoa moodboard preset dark
+```
+
+```bash
+stoa moodboard edit
+```
+**Interactive.** Walks through each field one by one: Design Direction → Colors (each individually) → Typography → Layout → Component Style → References. Press **Enter** to keep current value. Type a new value to replace. Type **q** to quit at any point.
+
+```bash
+stoa moodboard describe
+```
+**Interactive.** Opens the `.stoa/moodboard/` folder in Finder so you can drag screenshots in. Press **Enter** when ready. If you have an API key, Stoa analyzes the images with AI and writes the design system automatically. Without an API key, it prints a prompt you can paste into any Claude chat alongside your screenshot.
+
+```bash
+stoa moodboard sync
+```
+Regenerates `tokens.json` from `notes.md`. Usually happens automatically after preset or edit, but run this if you edited `notes.md` by hand.
+
+```bash
+stoa moodboard save-preset my-brand
+```
+Saves the current moodboard as `.stoa/presets/my-brand.json`. Reusable across projects — shows up in `stoa moodboard preset` picker.
+
+---
+
+### Refine
+
+```bash
+stoa refine "Build a waitlist page with email signup and referral system"
+```
+Runs the 5-stage pipeline. After completion, shows an interactive menu:
+
+| Key | Action | Notes |
+|-----|--------|-------|
+| **b** | Build with Claude Code | Launches Claude Code with the spec |
+| **c** | Copy spec to clipboard | Re-copy (Stage 1 is auto-copied on finish) |
+| **e** | Export as markdown | Writes to `specs/<slug>/spec.md` in project root |
+| **v** | View spec files | Opens spec directory in Finder |
+| **q** | Done | Exits |
+
+**Options:**
+```bash
+stoa refine "task" --mode api         # Force Anthropic API (needs key)
+stoa refine "task" --mode claude-code # Force Claude Code CLI
+stoa refine "task" --mode clipboard   # Get prompts without AI calls (free)
+stoa refine "task" --role planner     # Use a specific role
+stoa refine "task" --stages clarify,structure  # Run specific stages only
+```
+
+---
+
+### Specs
+
+```bash
+stoa specs list                # List all saved specs with dates and stage count
+stoa specs show <name>         # Print a spec's contents to terminal
+```
+
+Specs are saved in `.stoa/specs/<slug>/` with one markdown file per stage. The `[e]` export writes a combined `spec.md` to the visible `specs/` folder in your project root.
+
+---
+
+### Scenarios
+
+```bash
+stoa scenarios list              # List scenarios for the latest spec
+stoa scenarios list <name>       # List scenarios for a specific spec
 stoa scenarios run               # Walk through scenarios interactively
 stoa scenarios run <name>        # Run scenarios for a specific spec
+```
 
-# Guardrails & Roles
-stoa guardrails list             # List active guardrails
-stoa guardrails show <name>      # View a guardrail
-stoa roles list                  # List available roles
-stoa roles show <name>           # View a role
+**Interactive.** Each scenario shows GIVEN (what to set up) and EXPECTED (what to check). Press **y** for pass, **n** for fail, **s** to skip. Shows a summary at the end.
 
-# Config
-stoa config                      # View current config
+---
+
+### Review
+
+```bash
+stoa review                    # Review the latest spec
+stoa review <name>             # Review a specific spec
+```
+
+**Interactive.** Opens each stage for review. Accept, edit, or skip. After editing, optionally re-runs affected pipeline stages.
+
+---
+
+### Build & Verify
+
+```bash
+stoa build                     # Build the latest spec with Claude Code
+stoa build <name>              # Build a specific spec
+stoa verify                    # Run blind test verification
+stoa verify <name>             # Verify a specific spec
+```
+
+Build gives you a choice: build all at once or subtask by subtask. Verify runs the scenarios interactively after the build.
+
+---
+
+### Guardrails & Roles
+
+```bash
+stoa guardrails list           # List active guardrails
+stoa guardrails show <name>    # View a guardrail's content
+stoa guardrails add <name>     # Add a new guardrail
+stoa guardrails remove <name>  # Remove a guardrail
+stoa roles list                # List available roles
+stoa roles show <name>         # View a role's content
+stoa roles add <name>          # Add a new role
+stoa roles remove <name>       # Remove a role
+```
+
+Guardrails are rules injected into every refine (e.g. "don't delete existing code"). Roles are AI personas used via `--role` flag.
+
+---
+
+### Config
+
+```bash
+stoa config                      # View current settings
 stoa config set apiKey <key>     # Set Anthropic API key
-stoa config set model <model>    # Set model (default: claude-sonnet-4-20250514)
-stoa config set mode <mode>      # Set mode: api, claude-code, clipboard
+stoa config set model <model>    # Set model (default: claude-sonnet-4-6)
+stoa config set mode <mode>      # Set default mode: api, claude-code, clipboard
 ```
 
 ---
 
 ## Execution Modes
 
-Stoa has three ways to run the AI pipeline:
+| Mode | How it works | You need | Cost |
+|------|-------------|----------|------|
+| `api` | Direct Anthropic API call | API key (`stoa config set apiKey`) | ~$0.05/refine |
+| `claude-code` | Pipes to Claude Code CLI | Claude Code installed + subscription | Included in subscription |
+| `clipboard` | Returns prompts — no AI calls | Nothing | Free |
 
-| Mode | How it works | You need |
-|------|-------------|----------|
-| `api` | Direct Anthropic API call | API key (`stoa config set apiKey`) |
-| `claude-code` | Pipes to Claude Code CLI | Claude Code installed + subscription |
-| `clipboard` | Returns prompts — no AI calls | Nothing (free) |
+Stoa auto-detects: API key → `api`, Claude Code in PATH → `claude-code`, otherwise → `clipboard`.
 
-Stoa auto-detects: if you have an API key it uses `api`, if Claude Code is installed it uses `claude-code`, otherwise `clipboard`.
+In clipboard mode, Stoa prints each stage's prompt. Paste into any AI chat (Claude, ChatGPT, Cursor) and copy the response back. Same pipeline, just manual.
 
-In clipboard mode, Stoa prints each stage's prompt. You paste it into any AI chat (Claude, ChatGPT, Cursor) and copy the response back. Everything works — just manually.
+---
+
+## Keyboard Shortcuts
+
+All interactive commands support these:
+
+| Context | Key | Action |
+|---------|-----|--------|
+| Any prompt | `q` / `quit` / `exit` | Cancel and go back |
+| Arrow key menus | `↑` `↓` or `k` `j` | Navigate |
+| Arrow key menus | `Enter` | Select |
+| Arrow key menus | `q` | Cancel |
+| Post-refine menu | `b` `c` `e` `v` `q` | See table above |
+| Scenario runner | `y` `n` `s` | Pass / Fail / Skip |
+| Ctrl+C | Always | Force quit |
 
 ---
 
@@ -313,17 +467,23 @@ Add Stoa as an MCP server in Cursor. Create or edit `.cursor/mcp.json` in your p
 }
 ```
 
-Find the global path with:
-
+Find the global path:
 ```bash
-npm root -g
+echo "$(npm root -g)/stoa-mcp/dist/index.js"
 ```
 
 Then in Cursor's Agent chat:
-
 ```
 Use the refine_task tool with title: "My App" and description: "description of what I want"
 ```
+
+## Use with Claude Code
+
+Stoa works directly with Claude Code. After refining:
+
+1. Press `[b]` in the post-refine menu — launches Claude Code automatically
+2. Or copy the spec and paste it: `claude "Read the spec in .stoa/specs/<name>/ and build it"`
+3. Or use `stoa build` for the full guided experience
 
 ---
 
@@ -374,6 +534,12 @@ The spec references existing files by name and says "add to" instead of "rebuild
 - `Builder` — writes new features
 - `Fixer` — fixes bugs from failure context
 - `Planner` — breaks down large tasks
+
+**4 Style Presets:**
+- `Clean` — white, minimal, Linear/Vercel (applied by default)
+- `Dark` — dark background, violet accents, GitHub/Raycast
+- `Warm` — cream tones, amber accents, Cal.com/Stripe
+- `Bold` — high contrast, sharp corners, brutalist
 
 ---
 

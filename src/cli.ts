@@ -3,9 +3,9 @@ import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, extname } from "node:path";
 import { homedir } from "node:os";
-import { existsSync, readFileSync, constants } from "node:fs";
+import { existsSync, readFileSync, readdirSync, constants } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { refinePipeline } from "./core/refine.js";
@@ -23,7 +23,7 @@ import {
 import { refinePipeline as refineGuardrail } from "./guardrails/refine.js";
 import { refinePipeline as refineRole } from "./storage/roles-refine.js";
 import { toSlug, resolveSlug } from "./utils/slug.js";
-import { readMoodboard, writeSpecFiles, writeRefineMeta, listSpecs, showSpec } from "./storage/index.js";
+import { readMoodboard, writeSpecFiles, writeRefineMeta, listSpecs, showSpec, STAGE_FILENAMES } from "./storage/index.js";
 import {
   listRoles,
   addRole,
@@ -48,7 +48,10 @@ import { scanProject } from "./storage/project-scan.js";
 import { syncMoodboard } from "./storage/moodboard-sync.js";
 import { describeMoodboard } from "./storage/moodboard-describe.js";
 import { runSpecScenarios, loadSpecScenarios } from "./cli/scenarios-runner.js";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
+import { listPresets, loadPreset, applyPreset, savePreset } from "./storage/moodboard-presets.js";
+import { pickPreset } from "./cli/moodboard-picker.js";
+import { runMoodboardEdit } from "./cli/moodboard-edit.js";
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -151,6 +154,15 @@ function maskApiKey(value: string): string {
   return value.slice(0, 3) + "..." + value.slice(-4);
 }
 
+function detectEditor(): string {
+  // Prefer cursor → code → $EDITOR → open (macOS) → nano
+  try { execFileSync("which", ["cursor"], { stdio: "ignore" }); return "cursor"; } catch { /* */ }
+  try { execFileSync("which", ["code"], { stdio: "ignore" }); return "code"; } catch { /* */ }
+  if (process.env.EDITOR) return process.env.EDITOR;
+  if (process.platform === "darwin") return "open";
+  return "nano";
+}
+
 function copyToClipboard(text: string): void {
   try {
     const child = spawn("pbcopy", { stdio: ["pipe", "ignore", "ignore"] });
@@ -161,12 +173,143 @@ function copyToClipboard(text: string): void {
   }
 }
 
+async function buildExportMarkdown(specsDir: string, slug: string): Promise<string> {
+  const specDir = join(specsDir, slug);
+  const sections: string[] = [];
+
+  for (const stageNum of [1, 2, 3, 4, 5]) {
+    const filename = STAGE_FILENAMES[stageNum];
+    if (!filename) continue;
+    try {
+      const content = await readFile(join(specDir, filename), "utf-8");
+      const displayName = STAGE_DISPLAY_NAMES[stageNum] ?? `Stage ${stageNum}`;
+      sections.push(`## Stage ${stageNum}: ${displayName}\n\n${content.trimEnd()}`);
+    } catch {
+      // stage file missing — skip
+    }
+  }
+
+  return sections.join("\n\n") + "\n";
+}
+
+function waitForKeypress(): Promise<string> {
+  return new Promise((resolve) => {
+    const { stdin } = process;
+    if (!stdin.isTTY || typeof stdin.setRawMode !== "function") {
+      resolve("q");
+      return;
+    }
+    const wasRaw = stdin.isRaw;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.once("data", (data: Buffer) => {
+      stdin.setRawMode(wasRaw);
+      stdin.pause();
+      resolve(data.toString());
+    });
+  });
+}
+
+async function showPostRefineMenu(slug: string): Promise<void> {
+  const specsDir = join(process.cwd(), ".stoa", "specs");
+  const specDir = join(specsDir, slug);
+
+  const printMenu = (): void => {
+    writeln();
+    writeln(chalk.bold("What next?"));
+    writeln(`  ${chalk.cyan("[b]")} Build with Claude Code`);
+    writeln(`  ${chalk.cyan("[c]")} Copy spec to clipboard`);
+    writeln(`  ${chalk.cyan("[e]")} Export as single markdown`);
+    writeln(`  ${chalk.cyan("[v]")} View spec files`);
+    writeln(`  ${chalk.cyan("[q]")} Done`);
+    writeln();
+  };
+
+  if (!process.stdin.isTTY) {
+    writeln();
+    writeln(chalk.bold("Next steps:"));
+    writeln(`  ${chalk.cyan("stoa export")} ${slug}  — export spec as markdown`);
+    writeln(`  ${chalk.cyan("stoa build")} ${slug}   — build with Claude Code`);
+    writeln();
+    return;
+  }
+
+  printMenu();
+
+  while (true) {
+    const key = await waitForKeypress();
+
+    // Handle Ctrl+C
+    if (key === "\x03") {
+      process.exit(0);
+    }
+
+    switch (key.toLowerCase()) {
+      case "b": {
+        // Verify spec dir exists
+        try {
+          await access(specDir);
+        } catch {
+          writeln(chalk.red(`Error: spec directory not found: .stoa/specs/${slug}/`));
+          printMenu();
+          break;
+        }
+        const buildPrompt = `Read the spec in .stoa/specs/${slug}/ and build it. Follow all constraints and subtasks. Do not modify or delete the .stoa/ directory — it is not part of the project.`;
+        spawn("claude", [buildPrompt], { stdio: "inherit", detached: true });
+        return;
+      }
+
+      case "c": {
+        const markdown = await buildExportMarkdown(specsDir, slug);
+        copyToClipboard(markdown);
+        writeln(chalk.green("Spec copied to clipboard."));
+        printMenu();
+        break;
+      }
+
+      case "e": {
+        const markdown = await buildExportMarkdown(specsDir, slug);
+        const exportDir = join(process.cwd(), "specs", slug);
+        await mkdir(exportDir, { recursive: true });
+        const exportPath = join(exportDir, "spec.md");
+        await writeFile(exportPath, markdown, "utf-8");
+        writeln(chalk.green(`Exported to specs/${slug}/spec.md`));
+        printMenu();
+        break;
+      }
+
+      case "v": {
+        // Verify spec dir exists
+        try {
+          await access(specDir);
+        } catch {
+          writeln(chalk.red(`Error: spec directory not found: .stoa/specs/${slug}/`));
+          printMenu();
+          break;
+        }
+        const opener = process.platform === "darwin" ? "open" : "xdg-open";
+        spawn(opener, [specDir], { stdio: "ignore", detached: true });
+        writeln(chalk.dim(specDir));
+        printMenu();
+        break;
+      }
+
+      case "q": {
+        process.exit(0);
+      }
+
+      default:
+        // Ignore unrecognized keys
+        break;
+    }
+  }
+}
+
 async function printPostRefineOutput(slug: string, specScore: number): Promise<void> {
   const specsDir = join(process.cwd(), ".stoa", "specs");
   const descPath = join(specsDir, slug, "01-problem-statement.md");
-  const scenariosPath = join(specsDir, slug, "05-evaluation-design.md");
 
-  // Copy Stage 1 to clipboard
+  // Copy Stage 1 to clipboard (preserved behavior)
   let copiedToClipboard = false;
   try {
     const descContent = await readFile(descPath, "utf-8");
@@ -174,15 +317,6 @@ async function printPostRefineOutput(slug: string, specScore: number): Promise<v
     copiedToClipboard = true;
   } catch {
     // description file missing — skip
-  }
-
-  // Check if scenarios exist
-  let hasScenarios = false;
-  try {
-    const scenariosContent = await readFile(scenariosPath, "utf-8");
-    hasScenarios = scenariosContent.trim().length > 0;
-  } catch {
-    // no scenarios file
   }
 
   writeln();
@@ -195,14 +329,7 @@ async function printPostRefineOutput(slug: string, specScore: number): Promise<v
     writeln(chalk.dim("  Paste into Lovable, Bolt, v0, or any AI tool"));
   }
 
-  writeln();
-  writeln(chalk.green("→ Build prompt for Claude Code:"));
-  writeln(chalk.dim(`  Read the spec in .stoa/specs/${slug}/ and build it. Follow all constraints and subtasks.`));
-
-  if (hasScenarios) {
-    writeln();
-    writeln(chalk.green(`→ Scenarios saved. Run: ${chalk.white(`stoa scenarios run ${slug}`)}`));
-  }
+  await showPostRefineMenu(slug);
 }
 
 function resolveStages(stagesArg: string): (1 | 2 | 3 | 4 | 5)[] {
@@ -563,7 +690,8 @@ program
       process.exit(1);
     }
 
-    const editor = process.env.EDITOR || "nano";
+    // Detect best editor: cursor → code → $EDITOR → open (macOS) → nano
+    const editor = detectEditor();
     const child = spawn(editor, [fullPath], { stdio: "inherit" });
     child.on("exit", (code) => {
       process.exit(code ?? 0);
@@ -1030,7 +1158,125 @@ scenariosCmd
 
 const moodboardCmd = program
   .command("moodboard")
-  .description("Manage project moodboard (.stoa/moodboard/)");
+  .description("Manage project moodboard (.stoa/moodboard/)")
+  .action(() => {
+    // No subcommand → show status
+    const cwd = process.cwd();
+    const notesPath = join(cwd, ".stoa", "moodboard", "notes.md");
+    const tokensPath = join(cwd, ".stoa", "moodboard", "tokens.json");
+
+    if (!existsSync(join(cwd, ".stoa"))) {
+      writeln(chalk.red("No .stoa/ directory. Run 'stoa init' first."));
+      process.exit(1);
+    }
+
+    writeln();
+    writeln(chalk.bold("Moodboard Status"));
+    writeln();
+
+    // Check notes.md
+    if (existsSync(notesPath)) {
+      const raw = readFileSync(notesPath, "utf-8");
+      const stripped = raw.replace(/<!--[\s\S]*?-->/g, "").replace(/^#.*$/gm, "").trim();
+      if (stripped.length > 0) {
+        // Extract design direction (first non-empty section)
+        const dirMatch = raw.match(/# Design Direction\n([^\n#]+)/);
+        if (dirMatch) {
+          writeln(`  Style: ${chalk.cyan(dirMatch[1].trim())}`);
+        }
+      } else {
+        writeln(`  Style: ${chalk.dim("(empty — run 'stoa moodboard preset' to set one)")}`);
+      }
+    } else {
+      writeln(`  Style: ${chalk.dim("(no notes.md)")}`);
+    }
+
+    // Check tokens
+    if (existsSync(tokensPath)) {
+      try {
+        const tokens = JSON.parse(readFileSync(tokensPath, "utf-8"));
+        const colorCount = tokens.colors ? Object.keys(tokens.colors).length : 0;
+        writeln(`  Colors: ${colorCount > 0 ? chalk.green(`${colorCount} defined`) : chalk.dim("none")}`);
+      } catch {
+        writeln(`  Tokens: ${chalk.dim("invalid")}`);
+      }
+    } else {
+      writeln(`  Tokens: ${chalk.dim("not synced")}`);
+    }
+
+    // Check images
+    const moodboardDir = join(cwd, ".stoa", "moodboard");
+    if (existsSync(moodboardDir)) {
+      try {
+        const files = readdirSync(moodboardDir);
+        const imageExts = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"]);
+        const imageCount = files.filter((f) => imageExts.has(extname(f).toLowerCase())).length;
+        writeln(`  Images: ${imageCount > 0 ? chalk.green(`${imageCount} screenshot(s)`) : chalk.dim("none")}`);
+      } catch {
+        // ignore
+      }
+    }
+
+    writeln();
+    writeln(chalk.bold("Commands:"));
+    writeln(`  ${chalk.cyan("stoa moodboard preset")}       Switch style preset`);
+    writeln(`  ${chalk.cyan("stoa moodboard edit")}          Edit interactively`);
+    writeln(`  ${chalk.cyan("stoa moodboard describe")}      Extract design from screenshots`);
+    writeln(`  ${chalk.cyan("stoa moodboard sync")}          Regenerate tokens.json`);
+    writeln(`  ${chalk.cyan("stoa moodboard save-preset")}   Save current as reusable preset`);
+    writeln(`  ${chalk.cyan("stoa edit moodboard")}          Open in editor`);
+    writeln();
+  });
+
+moodboardCmd
+  .command("preset")
+  .description("Choose a style preset for your moodboard")
+  .argument("[name]", "Preset name (omit for interactive picker)")
+  .action(async (name?: string) => {
+    const cwd = process.cwd();
+
+    if (name) {
+      // Direct apply by name
+      const preset = loadPreset(cwd, name);
+      if (!preset) {
+        const available = listPresets(cwd).map((e) => e.id).join(", ");
+        process.stderr.write(chalk.red(`Preset "${name}" not found. Available: ${available}`) + "\n");
+        process.exit(1);
+      }
+      applyPreset(cwd, preset);
+      writeln(chalk.green(`Applied "${preset.name}" preset.`));
+      return;
+    }
+
+    // Interactive picker
+    const entries = listPresets(cwd);
+    if (entries.length === 0) {
+      writeln(chalk.red("No presets found."));
+      process.exit(1);
+    }
+
+    const selected = await pickPreset(entries);
+    if (!selected) {
+      writeln(chalk.dim("Cancelled."));
+      return;
+    }
+
+    applyPreset(cwd, selected.preset);
+    writeln(chalk.green(`Applied "${selected.preset.name}" preset.`));
+    writeln(chalk.dim("Run 'stoa moodboard edit' to customize, or 'stoa refine' to use it."));
+  });
+
+moodboardCmd
+  .command("edit")
+  .description("Edit moodboard interactively in the terminal")
+  .action(async () => {
+    try {
+      await runMoodboardEdit(process.cwd());
+    } catch (err: unknown) {
+      process.stderr.write(chalk.red(err instanceof Error ? err.message : String(err)) + "\n");
+      process.exit(1);
+    }
+  });
 
 moodboardCmd
   .command("sync")
@@ -1086,6 +1332,29 @@ moodboardCmd
       mode = "clipboard";
     }
 
+    // Open moodboard folder so user can drop screenshots
+    const moodboardDir = join(process.cwd(), ".stoa", "moodboard");
+    if (existsSync(moodboardDir)) {
+      writeln(chalk.cyan("Opening moodboard folder — drop your screenshots in..."));
+      if (process.platform === "darwin") {
+        spawn("open", [moodboardDir], { stdio: "ignore", detached: true });
+      } else {
+        spawn("xdg-open", [moodboardDir], { stdio: "ignore", detached: true });
+      }
+
+      // Wait for user to confirm
+      if (process.stdin.isTTY) {
+        const { createInterface } = await import("node:readline");
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        await new Promise<void>((resolve) => {
+          rl.question(chalk.dim("Press Enter when ready → "), () => {
+            rl.close();
+            resolve();
+          });
+        });
+      }
+    }
+
     const spinner = mode === "api" ? ora({ text: "Analyzing screenshots...", color: "cyan" }) : null;
 
     try {
@@ -1120,6 +1389,21 @@ moodboardCmd
       }
     } catch (err: unknown) {
       if (spinner) spinner.fail();
+      process.stderr.write(chalk.red(err instanceof Error ? err.message : String(err)) + "\n");
+      process.exit(1);
+    }
+  });
+
+moodboardCmd
+  .command("save-preset")
+  .description("Save current moodboard as a reusable preset")
+  .argument("<name>", "Name for the preset")
+  .action((name: string) => {
+    try {
+      const preset = savePreset(process.cwd(), name);
+      writeln(chalk.green(`Saved preset "${preset.name}" to .stoa/presets/${name}.json`));
+      writeln(chalk.dim("Use 'stoa moodboard preset' to apply it in other projects."));
+    } catch (err: unknown) {
       process.stderr.write(chalk.red(err instanceof Error ? err.message : String(err)) + "\n");
       process.exit(1);
     }

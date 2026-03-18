@@ -1,0 +1,18 @@
+{
+  "name": "Clean",
+  "description": "White, minimal, Linear-style",
+  "designDirection": "Clean, modern, minimal — inspired by Linear and Vercel",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#FAFAFA",
+    "border": "#E5E7EB",
+    "text": "#111827",
+    "text_secondary": "#6B7280",
+    "primary": "#6366F1",
+    "primary_hover": "#4F46E5"
+  },
+  "typography": "Sans-serif (Inter or system font). Large bold headings, regular weight body.",
+  "layout": "Single column centered, max-width 768px. Cards for grouped content.",
+  "componentStyle": "Rounded corners (8px). Subtle borders, no heavy shadows. Filled primary buttons, ghost secondary buttons.",
+  "references": "Linear, Notion, Vercel"
+}

@@ -3,6 +3,7 @@ import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toSlug } from "../utils/slug.js";
+import { loadPreset, applyPreset } from "./moodboard-presets.js";
 
 interface ProjectConfig {
   name: string;
@@ -60,33 +61,43 @@ export async function initProject(name: string, type: string, noTemplates = fals
   await mkdir(join(stoaDir, "scenarios"), { recursive: true });
   await mkdir(join(stoaDir, "specs"), { recursive: true });
   await mkdir(join(stoaDir, "moodboard"), { recursive: true });
+  await mkdir(join(stoaDir, "presets"), { recursive: true });
 
-  await writeFile(
-    join(stoaDir, "moodboard", "notes.md"),
-    `# Design Direction
-<!-- What should this feel like? E.g. "Minimal and fast like Linear" -->
+  // Apply "clean" preset as default moodboard
+  const cleanPreset = loadPreset(process.cwd(), "clean");
+  if (cleanPreset) {
+    applyPreset(process.cwd(), cleanPreset);
+  } else {
+    // Fallback if preset file missing
+    await writeFile(
+      join(stoaDir, "moodboard", "notes.md"),
+      `# Design Direction
+Clean, modern, minimal — inspired by Linear and Vercel
 
 # Colors
-<!-- Hex values. E.g. Primary: #E8C872, Background: #1A1A1A -->
+Background: #FFFFFF
+Surface: #FAFAFA
+Border: #E5E7EB
+Text: #111827
+Text Secondary: #6B7280
+Primary: #6366F1
+Primary Hover: #4F46E5
 
 # Layout
-<!-- E.g. "Sidebar navigation left, card-based content right" -->
+Single column centered, max-width 768px. Cards for grouped content.
 
 # Typography
-<!-- E.g. "Sans-serif, large headings, compact body text" -->
+Sans-serif (Inter or system font). Large bold headings, regular weight body.
 
 # Component Style
-<!-- E.g. "Rounded corners, subtle borders, no drop shadows" -->
+Rounded corners (8px). Subtle borders, no heavy shadows. Filled primary buttons, ghost secondary buttons.
 
 # References
-<!-- Apps to emulate. E.g. "Linear — task list density. Arc — sidebar tabs." -->
-
-# Images
-<!-- Drop files in moodboard/ folder, describe each here -->
-<!-- E.g. homepage-inspo.png — I want this hero layout -->
+Linear, Notion, Vercel
 `,
-    "utf-8",
-  );
+      "utf-8",
+    );
+  }
 
   // Create context.md (brand voice + dependencies + conventions in one file)
   await writeFile(

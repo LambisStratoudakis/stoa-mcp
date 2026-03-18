@@ -1,0 +1,18 @@
+{
+  "name": "Warm",
+  "description": "Cream tones, friendly SaaS feel",
+  "designDirection": "Warm, approachable, organic — inspired by Cal.com and Stripe docs",
+  "colors": {
+    "background": "#FFFBF5",
+    "surface": "#FFF7ED",
+    "border": "#E7D5C0",
+    "text": "#1C1917",
+    "text_secondary": "#78716C",
+    "primary": "#D97706",
+    "primary_hover": "#B45309"
+  },
+  "typography": "Serif headings (Georgia or Playfair Display), sans-serif body (Inter or system). Generous line height.",
+  "layout": "Single column centered, max-width 720px. Generous whitespace. Soft grouped sections.",
+  "componentStyle": "Rounded corners (12px). Soft shadows, warm borders. Filled buttons with slight rounding. Spacious padding.",
+  "references": "Cal.com, Stripe documentation, Notion in sepia"
+}

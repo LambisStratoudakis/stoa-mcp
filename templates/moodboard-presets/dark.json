@@ -1,0 +1,18 @@
+{
+  "name": "Dark",
+  "description": "Dark background, muted accents, like GitHub/Raycast",
+  "designDirection": "Dark, focused, minimal — inspired by Raycast and GitHub",
+  "colors": {
+    "background": "#0A0A0B",
+    "surface": "#18181B",
+    "border": "#27272A",
+    "text": "#FAFAFA",
+    "text_secondary": "#A1A1AA",
+    "primary": "#8B5CF6",
+    "primary_hover": "#7C3AED"
+  },
+  "typography": "Sans-serif (Inter or system font). High contrast text on dark backgrounds.",
+  "layout": "Single column centered, max-width 768px. Cards with subtle borders on dark surfaces.",
+  "componentStyle": "Rounded corners (8px). Faint borders, no shadows, glow accents on focus. Filled primary buttons.",
+  "references": "GitHub dark, Raycast, Arc browser"
+}

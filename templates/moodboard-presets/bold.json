@@ -1,0 +1,18 @@
+{
+  "name": "Bold",
+  "description": "High contrast, strong colors, brutalist",
+  "designDirection": "Bold, high-contrast, brutalist — unapologetically opinionated",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F5F5F5",
+    "border": "#000000",
+    "text": "#000000",
+    "text_secondary": "#525252",
+    "primary": "#DC2626",
+    "primary_hover": "#B91C1C"
+  },
+  "typography": "Sans-serif (Helvetica, Arial, or system). Heavy weight headings, tight letter spacing. All-caps for labels.",
+  "layout": "Single column, full-width sections. Grid-based. Tight spacing, dense information.",
+  "componentStyle": "Sharp corners (2px radius). Thick borders (2px). No shadows. High contrast buttons. Monospace for data.",
+  "references": "Bloomberg terminal, Supreme, brutalist web design"
+}
