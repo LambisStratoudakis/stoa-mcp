@@ -723,8 +723,11 @@ program
     writeln(chalk.green("  context.md — brand voice, dependencies, conventions"));
     writeln(chalk.green("  lessons.md — project memory (grows automatically)"));
     writeln();
-    writeln(`Run ${chalk.cyan("stoa refine \"your idea\"")} to get started`);
-    writeln(chalk.dim("Optional: edit moodboard/notes.md and context.md to customize your design system"));
+    writeln(`Run ${chalk.cyan('stoa refine "your idea"')} to get started`);
+    writeln();
+    writeln(chalk.dim("To customize first:"));
+    writeln(chalk.dim(`  stoa moodboard edit     — design system`));
+    writeln(chalk.dim(`  stoa edit context       — dependencies & conventions`));
   });
 
 // ── stoa guardrails ──────────────────────────────────────────────────
